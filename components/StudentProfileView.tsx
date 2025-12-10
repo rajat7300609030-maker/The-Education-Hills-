@@ -34,7 +34,9 @@ import {
     Share2,
     AlertTriangle,
     ChevronLeft,
-    ChevronRight
+    ChevronRight,
+    Camera,
+    ListPlus
 } from 'lucide-react';
 import { db } from '../services/db';
 import { Student, FeeStructure, PaymentRecord, UserRole } from '../types';
@@ -45,9 +47,10 @@ interface Props {
     onBack: () => void;
     userRole?: UserRole;
     onNavigateToParentProfile?: (studentId: string) => void;
+    onNavigateToFees?: (studentId: string) => void;
 }
 
-const StudentProfileView: React.FC<Props> = ({ studentId, onBack, userRole = UserRole.ADMIN, onNavigateToParentProfile }) => {
+const StudentProfileView: React.FC<Props> = ({ studentId, onBack, userRole = UserRole.ADMIN, onNavigateToParentProfile, onNavigateToFees }) => {
     const { showNotification } = useNotification();
     const [refreshKey, setRefreshKey] = useState(0); 
     const [classes, setClasses] = useState<string[]>([]);
@@ -59,6 +62,9 @@ const StudentProfileView: React.FC<Props> = ({ studentId, onBack, userRole = Use
     const [isDeletePaymentModalOpen, setIsDeletePaymentModalOpen] = useState(false); // For Payment
     const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
     const [isIdCardModalOpen, setIsIdCardModalOpen] = useState(false);
+    
+    // Fee Config Modal State
+    const [isFeeConfigModalOpen, setIsFeeConfigModalOpen] = useState(false);
 
     // ID Card State
     const [currentIdCardDesign, setCurrentIdCardDesign] = useState(0);
@@ -79,8 +85,18 @@ const StudentProfileView: React.FC<Props> = ({ studentId, onBack, userRole = Use
         address: '',
         totalClassFees: '',
         backFees: '',
-        admissionDate: ''
+        admissionDate: '',
+        avatar: ''
     });
+
+    // New Fee Form State
+    const [newFeeForm, setNewFeeForm] = useState({
+        name: '',
+        amount: '',
+        dueDate: ''
+    });
+
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const [paymentForm, setPaymentForm] = useState({
         amount: '',
@@ -101,7 +117,7 @@ const StudentProfileView: React.FC<Props> = ({ studentId, onBack, userRole = Use
         return db.getStudents().find(s => s.id === studentId);
     }, [studentId, refreshKey]);
 
-    const fees = useMemo(() => db.getFees(), []);
+    const fees = useMemo(() => db.getFees(), [refreshKey]); // Refresh fees when updated
     
     const payments = useMemo(() => {
         if (!studentId) return [];
@@ -122,7 +138,8 @@ const StudentProfileView: React.FC<Props> = ({ studentId, onBack, userRole = Use
                 address: student.address || '',
                 totalClassFees: student.totalClassFees?.toString() || '',
                 backFees: student.backFees?.toString() || '',
-                admissionDate: student.admissionDate || ''
+                admissionDate: student.admissionDate || '',
+                avatar: student.avatar || ''
             });
         }
     }, [student, isEditModalOpen]);
@@ -254,6 +271,17 @@ const StudentProfileView: React.FC<Props> = ({ studentId, onBack, userRole = Use
 
     // --- Actions ---
 
+    const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setStudentForm(prev => ({ ...prev, avatar: reader.result as string }));
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
     const handleUpdateStudent = (e: React.FormEvent) => {
         e.preventDefault();
         const updatedStudent: Student = {
@@ -266,7 +294,8 @@ const StudentProfileView: React.FC<Props> = ({ studentId, onBack, userRole = Use
             address: studentForm.address,
             totalClassFees: studentForm.totalClassFees ? parseFloat(studentForm.totalClassFees) : undefined,
             backFees: studentForm.backFees ? parseFloat(studentForm.backFees) : undefined,
-            admissionDate: studentForm.admissionDate
+            admissionDate: studentForm.admissionDate,
+            avatar: studentForm.avatar
         };
         db.updateStudent(updatedStudent);
         showNotification("Student updated successfully", "success");
@@ -279,6 +308,36 @@ const StudentProfileView: React.FC<Props> = ({ studentId, onBack, userRole = Use
         showNotification("Student deleted", "success");
         setIsDeleteModalOpen(false);
         onBack();
+    };
+
+    const handleSaveFeeStructure = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newFeeForm.name || !newFeeForm.amount || !newFeeForm.dueDate) return;
+
+        const newFee: FeeStructure = {
+            id: `F_${Date.now()}`,
+            name: newFeeForm.name,
+            amount: parseFloat(newFeeForm.amount),
+            dueDate: newFeeForm.dueDate,
+            session: student.session
+        };
+
+        // 1. Add to Global Fee List
+        db.addFeeStructure(newFee);
+
+        // 2. Assign to current student
+        const updatedStudent = {
+            ...student,
+            feeStructureIds: [...student.feeStructureIds, newFee.id]
+        };
+        db.updateStudent(updatedStudent);
+
+        showNotification("New Fee added and assigned to student", "success");
+        
+        // Reset and Close
+        setNewFeeForm({ name: '', amount: '', dueDate: '' });
+        setIsFeeConfigModalOpen(false);
+        setRefreshKey(prev => prev + 1);
     };
 
     const handleSavePayment = (e: React.FormEvent) => {
@@ -317,8 +376,12 @@ const StudentProfileView: React.FC<Props> = ({ studentId, onBack, userRole = Use
     };
 
     const handleEditPayment = (payment: PaymentRecord) => {
-        setSelectedPayment(payment);
-        setIsPayModalOpen(true);
+        if (onNavigateToFees) {
+            onNavigateToFees(payment.studentId);
+        } else {
+            setSelectedPayment(payment);
+            setIsPayModalOpen(true);
+        }
     };
 
     const handleDeletePayment = (payment: PaymentRecord) => {
@@ -396,8 +459,7 @@ const StudentProfileView: React.FC<Props> = ({ studentId, onBack, userRole = Use
         if (onNavigateToParentProfile) {
             onNavigateToParentProfile(student.id);
         } else {
-            // Fallback just in case
-            alert(`Parent Group Profile for: ${student.parentName}`);
+            alert(`Navigate to parent group for ${student.parentName}`);
         }
     };
 
@@ -492,17 +554,29 @@ const StudentProfileView: React.FC<Props> = ({ studentId, onBack, userRole = Use
             );
         }
         
-        // Return placeholder for other designs if simplified logic used, 
-        // but ideally this should replicate the full switch from StudentManager for consistency.
-        // For now, defaulting to Design 1 logic for all indices to ensure something renders.
         return (
              <div id="id-card-content-profile" className="w-[300px] h-[480px] bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden relative flex flex-col justify-center items-center">
                  <p className="text-gray-500">Design Preview {currentIdCardDesign + 1}</p>
-                 <p className="text-xs text-gray-400 text-center px-4">Switch designs to see variations (Logic duplicated from Manager)</p>
+                 <p className="text-xs text-gray-400 text-center px-4">Switch designs to see variations</p>
              </div>
         );
     };
 
+    // Actions Definition using Emojis
+    const profileActions = [
+        { icon: '💳', label: 'Pay', onClick: () => { 
+            if (onNavigateToFees && student) {
+                onNavigateToFees(student.id);
+            } else {
+                setSelectedPayment(null); 
+                setIsPayModalOpen(true); 
+            }
+        }, color: 'text-green-600', ring: 'group-hover/btn:ring-green-200', role: UserRole.ADMIN },
+        { icon: '👨‍👩‍👧‍👦', label: 'Group', onClick: handleGroupClick, color: 'text-purple-600', ring: 'group-hover/btn:ring-purple-200', role: 'ALL' },
+        { icon: '📞', label: 'Call', onClick: handleCallParent, color: 'text-teal-600', ring: 'group-hover/btn:ring-teal-200', role: 'ALL' }
+    ];
+
+    const visibleActions = profileActions.filter(action => action.role === 'ALL' || action.role === userRole);
 
     return (
         <div className="space-y-6 animate-in slide-in-from-right-8 duration-500 max-w-7xl mx-auto pb-10">
@@ -558,25 +632,6 @@ const StudentProfileView: React.FC<Props> = ({ studentId, onBack, userRole = Use
                                         </div>
                                     </div>
                                 </div>
-
-                                <div className="flex flex-wrap gap-3">
-                                    {userRole === UserRole.ADMIN && (
-                                        <>
-                                            <button 
-                                                onClick={() => setIsEditModalOpen(true)} 
-                                                className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 rounded-lg text-sm font-bold hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors shadow-sm"
-                                            >
-                                                <Edit className="w-4 h-4 text-indigo-600 dark:text-indigo-400" /> Edit
-                                            </button>
-                                            <button 
-                                                onClick={() => setIsDeleteModalOpen(true)} 
-                                                className="flex items-center gap-2 px-4 py-2 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 text-red-600 dark:text-red-400 rounded-lg text-sm font-bold hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors shadow-sm"
-                                            >
-                                                <Trash2 className="w-4 h-4" /> Delete
-                                            </button>
-                                        </>
-                                    )}
-                                </div>
                             </div>
                         </div>
                     </div>
@@ -593,16 +648,6 @@ const StudentProfileView: React.FC<Props> = ({ studentId, onBack, userRole = Use
                             <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
                                 <User className="w-5 h-5 text-indigo-500" /> 👤 Personal Details
                             </h3>
-                            {userRole === UserRole.ADMIN && (
-                                <div className="flex gap-2">
-                                    <button onClick={() => setIsEditModalOpen(true)} className="p-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors" title="Edit Details">
-                                        <Edit className="w-4 h-4" />
-                                    </button>
-                                    <button onClick={() => setIsDeleteModalOpen(true)} className="p-2 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors" title="Delete Student">
-                                        <Trash2 className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            )}
                         </div>
                         <div className="space-y-4 text-sm">
                             <div className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-700">
@@ -624,34 +669,39 @@ const StudentProfileView: React.FC<Props> = ({ studentId, onBack, userRole = Use
                         </div>
                     </div>
 
-                    {/* NEW: Quick Actions Row */}
-                    <div className="flex justify-between items-center gap-2 px-1">
-                        <button onClick={() => setIsEditModalOpen(true)} className="flex flex-col items-center gap-1 group">
-                            <div className="w-12 h-12 rounded-full bg-white dark:bg-gray-800 shadow-md border border-gray-100 dark:border-gray-700 flex items-center justify-center text-xl group-hover:scale-110 transition-transform text-indigo-600 dark:text-indigo-400">✏️</div>
-                            <span className="text-[10px] font-bold text-gray-600 dark:text-gray-400 uppercase">Edit</span>
-                        </button>
-                        <button onClick={() => { setSelectedPayment(null); setIsPayModalOpen(true); }} className="flex flex-col items-center gap-1 group">
-                            <div className="w-12 h-12 rounded-full bg-white dark:bg-gray-800 shadow-md border border-gray-100 dark:border-gray-700 flex items-center justify-center text-xl group-hover:scale-110 transition-transform text-green-600 dark:text-green-400">💳</div>
-                            <span className="text-[10px] font-bold text-gray-600 dark:text-gray-400 uppercase">Pay Fees</span>
-                        </button>
-                        <button onClick={() => { setCurrentIdCardDesign(0); setIsIdCardModalOpen(true); }} className="flex flex-col items-center gap-1 group">
-                            <div className="w-12 h-12 rounded-full bg-white dark:bg-gray-800 shadow-md border border-gray-100 dark:border-gray-700 flex items-center justify-center text-xl group-hover:scale-110 transition-transform text-sky-600 dark:text-sky-400">🪪</div>
-                            <span className="text-[10px] font-bold text-gray-600 dark:text-gray-400 uppercase">ID Card</span>
-                        </button>
-                        <button onClick={handleGroupClick} className="flex flex-col items-center gap-1 group">
-                            <div className="w-12 h-12 rounded-full bg-white dark:bg-gray-800 shadow-md border border-gray-100 dark:border-gray-700 flex items-center justify-center text-xl group-hover:scale-110 transition-transform text-purple-600 dark:text-purple-400">👨‍👩‍👧‍👦</div>
-                            <span className="text-[10px] font-bold text-gray-600 dark:text-gray-400 uppercase">Group</span>
-                        </button>
-                        <button onClick={handleCallParent} className="flex flex-col items-center gap-1 group">
-                            <div className="w-12 h-12 rounded-full bg-white dark:bg-gray-800 shadow-md border border-gray-100 dark:border-gray-700 flex items-center justify-center text-xl group-hover:scale-110 transition-transform text-teal-600 dark:text-teal-400">📞</div>
-                            <span className="text-[10px] font-bold text-gray-600 dark:text-gray-400 uppercase">Call</span>
-                        </button>
-                        {userRole === UserRole.ADMIN && (
-                            <button onClick={() => setIsDeleteModalOpen(true)} className="flex flex-col items-center gap-1 group">
-                                <div className="w-12 h-12 rounded-full bg-white dark:bg-gray-800 shadow-md border border-gray-100 dark:border-gray-700 flex items-center justify-center text-xl group-hover:scale-110 transition-transform text-red-600 dark:text-red-400">🗑️</div>
-                                <span className="text-[10px] font-bold text-gray-600 dark:text-gray-400 uppercase">Delete</span>
+                    {/* NEW: Quick Actions Row (Circular) */}
+                    <div className="flex flex-wrap justify-between items-center gap-3 px-2 mt-4">
+                        {visibleActions.map((action, idx) => (
+                            <button 
+                                key={idx}
+                                onClick={action.onClick}
+                                className="group/btn flex flex-col items-center gap-1 focus:outline-none transition-transform active:scale-95"
+                            >
+                                <div className={`
+                                    w-9 h-9 rounded-full bg-white dark:bg-gray-800 
+                                    shadow-md dark:shadow-none
+                                    border border-gray-100 dark:border-gray-700
+                                    flex items-center justify-center text-lg
+                                    transition-all duration-300
+                                    group-hover/btn:scale-110 group-hover/btn:-translate-y-1 group-hover/btn:shadow-lg
+                                    group-focus/btn:ring-2 ${action.ring} dark:group-focus/btn:ring-gray-700
+                                    ${action.color} dark:text-gray-200
+                                `}>
+                                    <span className="transform transition-transform duration-300 group-hover/btn:rotate-12">{action.icon}</span>
+                                </div>
+                                
+                                <span className="
+                                    text-[6px] font-bold uppercase tracking-wide
+                                    text-gray-500 dark:text-gray-400
+                                    bg-white/80 dark:bg-gray-800/80 px-2 py-0.5 rounded-full
+                                    border border-gray-100 dark:border-gray-700
+                                    transition-colors group-hover/btn:text-gray-900 dark:group-hover/btn:text-white
+                                    group-hover/btn:border-gray-300 dark:group-hover/btn:border-gray-500
+                                ">
+                                    {action.label}
+                                </span>
                             </button>
-                        )}
+                        ))}
                     </div>
                 </div>
 
@@ -668,10 +718,10 @@ const StudentProfileView: React.FC<Props> = ({ studentId, onBack, userRole = Use
                             </div>
                             {userRole === UserRole.ADMIN && (
                                 <button 
-                                    onClick={() => { setSelectedPayment(null); setIsPayModalOpen(true); }} 
-                                    className="flex items-center gap-2 px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-bold hover:bg-green-700 shadow-sm shadow-green-200 dark:shadow-none transition-colors"
+                                    onClick={() => setIsFeeConfigModalOpen(true)} 
+                                    className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 shadow-sm shadow-indigo-200 dark:shadow-none transition-colors"
                                 >
-                                    <CreditCard className="w-3.5 h-3.5" /> Pay Fees
+                                    <Edit className="w-3.5 h-3.5" /> Edit/Manage Fees
                                 </button>
                             )}
                         </div>
@@ -843,15 +893,39 @@ const StudentProfileView: React.FC<Props> = ({ studentId, onBack, userRole = Use
                 </div>
             </div>
 
-            {/* --- Modals --- */}
+            {/* --- ADD / EDIT STUDENT MODAL --- */}
             {isEditModalOpen && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-lg p-6">
-                        <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-xl font-bold text-gray-900 dark:text-white">✏️ Edit Student</h2>
-                            <button onClick={() => setIsEditModalOpen(false)}><X className="w-5 h-5 text-gray-500" /></button>
+                    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto custom-scrollbar">
+                        <div className="flex justify-between items-center p-6 bg-gradient-to-r from-indigo-600 to-indigo-800 text-white">
+                            <h2 className="text-xl font-bold flex items-center gap-2">
+                                <Edit className="w-5 h-5" /> Edit Student Details
+                            </h2>
+                            <button onClick={() => setIsEditModalOpen(false)} className="text-white/70 hover:text-white p-1 rounded-full"><X className="w-5 h-5" /></button>
                         </div>
-                        <form onSubmit={handleUpdateStudent} className="space-y-4">
+                        <form onSubmit={handleUpdateStudent} className="p-6 space-y-5">
+                            <div className="flex justify-center mb-4">
+                                <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+                                    <div className="w-24 h-24 rounded-full bg-gray-100 dark:bg-gray-700 border-2 border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center overflow-hidden">
+                                        {studentForm.avatar ? (
+                                            <img src={studentForm.avatar} alt="Upload" className="w-full h-full object-cover" />
+                                        ) : (
+                                            <span className="text-gray-400 text-2xl font-bold">{studentForm.name ? studentForm.name.charAt(0) : <User className="w-8 h-8 opacity-50" />}</span>
+                                        )}
+                                    </div>
+                                    <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <Camera className="w-6 h-6 text-white" />
+                                    </div>
+                                    <input 
+                                        type="file" 
+                                        ref={fileInputRef} 
+                                        className="hidden" 
+                                        accept="image/*" 
+                                        onChange={handlePhotoUpload}
+                                    />
+                                </div>
+                            </div>
+
                             <div className="grid grid-cols-2 gap-4">
                                 <input className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:text-white" placeholder="Name" value={studentForm.name} onChange={e => setStudentForm({...studentForm, name: e.target.value})} required />
                                 <input className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:text-white" placeholder="Grade" value={studentForm.grade} onChange={e => setStudentForm({...studentForm, grade: e.target.value})} required />
@@ -891,6 +965,62 @@ const StudentProfileView: React.FC<Props> = ({ studentId, onBack, userRole = Use
                             <button type="submit" className="w-full py-3 bg-green-600 text-white rounded-lg font-bold mt-2">
                                 {selectedPayment ? 'Update' : 'Confirm Payment'}
                             </button>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* --- FEE CONFIGURATION MODAL --- */}
+            {isFeeConfigModalOpen && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="flex justify-between items-center p-6 bg-gradient-to-r from-indigo-600 to-indigo-800 text-white">
+                            <h2 className="text-xl font-bold flex items-center gap-2">
+                                <ListPlus className="w-5 h-5" /> Manage Fees
+                            </h2>
+                            <button onClick={() => setIsFeeConfigModalOpen(false)} className="text-white/70 hover:text-white p-1 rounded-full"><X className="w-5 h-5" /></button>
+                        </div>
+                        <form onSubmit={handleSaveFeeStructure} className="p-6 space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Fee Category Name</label>
+                                <input 
+                                    required 
+                                    className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:text-white" 
+                                    placeholder="e.g. Lab Fee" 
+                                    value={newFeeForm.name} 
+                                    onChange={e => setNewFeeForm({...newFeeForm, name: e.target.value})} 
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Amount</label>
+                                <input 
+                                    required 
+                                    type="number"
+                                    className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:text-white" 
+                                    placeholder="0.00" 
+                                    value={newFeeForm.amount} 
+                                    onChange={e => setNewFeeForm({...newFeeForm, amount: e.target.value})} 
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Due Date</label>
+                                <input 
+                                    required 
+                                    type="date"
+                                    className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:text-white" 
+                                    value={newFeeForm.dueDate} 
+                                    onChange={e => setNewFeeForm({...newFeeForm, dueDate: e.target.value})} 
+                                />
+                            </div>
+                            <div className="pt-2">
+                                <p className="text-xs text-gray-500 mb-4">
+                                    <AlertCircle className="w-3 h-3 inline mr-1" />
+                                    This will create a new fee type globally and assign it to this student.
+                                </p>
+                                <button type="submit" className="w-full py-3 bg-indigo-600 text-white rounded-lg font-bold shadow-lg hover:bg-indigo-700 transition-all">
+                                    Save & Assign Fee
+                                </button>
+                            </div>
                         </form>
                     </div>
                 </div>

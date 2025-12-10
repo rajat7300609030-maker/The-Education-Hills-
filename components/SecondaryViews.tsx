@@ -16,6 +16,8 @@ interface ExpensesViewProps {
 }
 
 export const ExpensesView: React.FC<ExpensesViewProps> = ({ userRole = UserRole.ADMIN }) => {
+    // ... (No changes to ExpensesView logic, image upload is in SchoolProfileView) ...
+    // Keeping existing ExpensesView logic intact for brevity, only SchoolProfileView needs changes
     const { showNotification } = useNotification();
     const [expenses, setExpenses] = useState<Expense[]>([]);
     const [currentSession, setCurrentSession] = useState('');
@@ -523,6 +525,41 @@ export const SchoolProfileView: React.FC<SchoolProfileViewProps> = ({ onNavigate
         setSliderImages(p.sliderImages || []);
     }, []);
 
+    // Helper: Compress Image
+    const compressImage = (file: File, maxWidth: number, maxHeight: number, quality: number = 0.7): Promise<string> => {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = (event) => {
+                const img = new Image();
+                img.src = event.target?.result as string;
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > height) {
+                        if (width > maxWidth) {
+                            height = Math.round(height * (maxWidth / width));
+                            width = maxWidth;
+                        }
+                    } else {
+                        if (height > maxHeight) {
+                            width = Math.round(width * (maxHeight / height));
+                            height = maxHeight;
+                        }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx?.drawImage(img, 0, 0, width, height);
+                    resolve(canvas.toDataURL('image/jpeg', quality));
+                };
+            };
+        });
+    };
+
     const handleSave = (e: React.FormEvent) => {
         e.preventDefault();
         db.updateSchoolProfile(formData);
@@ -563,25 +600,32 @@ export const SchoolProfileView: React.FC<SchoolProfileViewProps> = ({ onNavigate
         }
     };
 
-    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setNewSlide(prev => ({ ...prev, url: reader.result as string }));
-            };
-            reader.readAsDataURL(file);
+            try {
+                const compressed = await compressImage(file, 800, 450, 0.7); // Slide images
+                setNewSlide(prev => ({ ...prev, url: compressed }));
+                showNotification("Image compressed", "success");
+            } catch (e) {
+                console.error(e);
+                showNotification("Image upload failed", "error");
+            }
         }
     };
 
-    const handleProfileImageUpload = (e: React.ChangeEvent<HTMLInputElement>, field: 'logo' | 'backgroundImage') => {
+    const handleProfileImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: 'logo' | 'backgroundImage') => {
         const file = e.target.files?.[0];
         if (file) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setFormData(prev => ({ ...prev, [field]: reader.result as string }));
-            };
-            reader.readAsDataURL(file);
+            try {
+                const dims = field === 'logo' ? {w: 400, h: 400} : {w: 1200, h: 600};
+                const compressed = await compressImage(file, dims.w, dims.h, 0.7);
+                setFormData(prev => ({ ...prev, [field]: compressed }));
+                showNotification(`${field === 'logo' ? 'Logo' : 'Background'} updated`, 'success');
+            } catch (e) {
+                console.error(e);
+                showNotification("Image upload failed", "error");
+            }
         }
     };
 
@@ -1180,6 +1224,7 @@ export const SchoolProfileView: React.FC<SchoolProfileViewProps> = ({ onNavigate
     );
 };
 
+// ... (Rest of file unchanged: SettingsView, RecycleBinView) ...
 // --- SETTINGS VIEW ---
 interface SettingsViewProps {
     darkMode: boolean;

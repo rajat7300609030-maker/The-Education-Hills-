@@ -97,20 +97,20 @@ const DashboardLayout: React.FC<Props> = ({ user, currentView, onViewChange, onL
 
   const getPageBackgroundGradient = (view: AppView) => {
     switch (view) {
-      case AppView.DASHBOARD: return 'bg-gradient-to-br from-indigo-100 via-white to-blue-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800';
-      case AppView.STUDENT_MANAGER: return 'bg-gradient-to-br from-violet-100 via-white to-purple-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800';
-      case AppView.FEES_MANAGER: return 'bg-gradient-to-br from-emerald-100 via-white to-teal-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800';
-      case AppView.EXPENSES: return 'bg-gradient-to-br from-rose-100 via-white to-red-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800';
-      case AppView.SCHOOL_PROFILE: return 'bg-gradient-to-br from-slate-200 via-white to-gray-100 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800';
-      case AppView.SETTINGS: return 'bg-gradient-to-br from-gray-200 via-white to-slate-100 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800';
-      case AppView.RECYCLE_BIN: return 'bg-gradient-to-br from-orange-100 via-white to-amber-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800';
-      case AppView.USER_PROFILE: return 'bg-gradient-to-br from-indigo-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800';
-      default: return 'bg-gradient-to-br from-indigo-100 via-white to-blue-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800';
+      case AppView.DASHBOARD: return 'bg-gradient-to-br from-indigo-100 via-white to-blue-50 dark:from-black dark:via-black dark:to-gray-900';
+      case AppView.STUDENT_MANAGER: return 'bg-gradient-to-br from-violet-100 via-white to-purple-50 dark:from-black dark:via-black dark:to-gray-900';
+      case AppView.FEES_MANAGER: return 'bg-gradient-to-br from-emerald-100 via-white to-teal-50 dark:from-black dark:via-black dark:to-gray-900';
+      case AppView.EXPENSES: return 'bg-gradient-to-br from-rose-100 via-white to-red-50 dark:from-black dark:via-black dark:to-gray-900';
+      case AppView.SCHOOL_PROFILE: return 'bg-gradient-to-br from-slate-200 via-white to-gray-100 dark:from-black dark:via-black dark:to-gray-900';
+      case AppView.SETTINGS: return 'bg-gradient-to-br from-gray-200 via-white to-slate-100 dark:from-black dark:via-black dark:to-gray-900';
+      case AppView.RECYCLE_BIN: return 'bg-gradient-to-br from-orange-100 via-white to-amber-50 dark:from-black dark:via-black dark:to-gray-900';
+      case AppView.USER_PROFILE: return 'bg-gradient-to-br from-indigo-50 via-white to-purple-50 dark:from-black dark:via-black dark:to-gray-900';
+      default: return 'bg-gradient-to-br from-indigo-100 via-white to-blue-50 dark:from-black dark:via-black dark:to-gray-900';
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex font-sans transition-colors duration-300">
+    <div className="min-h-screen bg-gray-50 dark:bg-black flex font-sans transition-colors duration-300">
       {/* Sidebar */}
       <aside className={`
         fixed inset-y-0 left-0 z-40 w-72 

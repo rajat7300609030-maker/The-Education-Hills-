@@ -31,6 +31,7 @@ export interface User {
   name: string;
   role: UserRole;
   avatar?: string;
+  coverImage?: string;
   email?: string;
   phone?: string;
   bio?: string;

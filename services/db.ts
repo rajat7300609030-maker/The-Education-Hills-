@@ -65,7 +65,11 @@ const saveToStorage = (key: string, data: any) => {
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(key, JSON.stringify(data));
-  } catch (e) {
+  } catch (e: any) {
+    // Check for QuotaExceededError
+    if (e.name === 'QuotaExceededError' || e.code === 22) {
+       alert(`Storage Quota Exceeded!\n\nThe application cannot save more data to ${key}. This is often caused by storing too many large images.\n\nPlease delete some old data or try to use smaller images.`);
+    }
     console.error(`Error saving ${key}`, e);
   }
 };
@@ -200,6 +204,12 @@ export const db = {
   },
 
   getFees: (): FeeStructure[] => getFromStorage(KEYS.FEES, FEE_STRUCTURES),
+
+  addFeeStructure: (fee: FeeStructure) => {
+    const list = db.getFees();
+    list.push(fee);
+    saveToStorage(KEYS.FEES, list);
+  },
 
   getExpenses: (): Expense[] => getFromStorage(KEYS.EXPENSES, MOCK_EXPENSES),
 

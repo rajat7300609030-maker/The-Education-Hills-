@@ -189,16 +189,54 @@ const StudentManager: React.FC<StudentManagerProps> = ({ onNavigateToProfile, on
         return studentForm.name && studentForm.grade && studentForm.parentName && studentForm.contact;
     };
 
+    // Helper: Compress Image
+    const compressImage = (file: File, maxWidth: number, maxHeight: number, quality: number = 0.7): Promise<string> => {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = (event) => {
+                const img = new Image();
+                img.src = event.target?.result as string;
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > height) {
+                        if (width > maxWidth) {
+                            height = Math.round(height * (maxWidth / width));
+                            width = maxWidth;
+                        }
+                    } else {
+                        if (height > maxHeight) {
+                            width = Math.round(width * (maxHeight / height));
+                            height = maxHeight;
+                        }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx?.drawImage(img, 0, 0, width, height);
+                    resolve(canvas.toDataURL('image/jpeg', quality));
+                };
+            };
+        });
+    };
+
     // --- Actions Handlers ---
 
-    const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setStudentForm(prev => ({ ...prev, avatar: reader.result as string }));
-            };
-            reader.readAsDataURL(file);
+            try {
+                const compressed = await compressImage(file, 400, 400); // Resize to 400x400
+                setStudentForm(prev => ({ ...prev, avatar: compressed }));
+                showNotification("Photo uploaded & compressed", "success");
+            } catch (err) {
+                console.error("Image processing error", err);
+                showNotification("Failed to upload photo", "error");
+            }
         }
     };
 
@@ -716,6 +754,7 @@ const StudentManager: React.FC<StudentManagerProps> = ({ onNavigateToProfile, on
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
              <div className="flex flex-col gap-1">
+                {/* ... existing header ... */}
                 <div className="flex items-center gap-3">
                     <h1 className="text-2xl font-bold text-gray-900 dark:text-white">👨‍🎓 Student Manager</h1>
                     <span className="px-2 py-0.5 bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 rounded text-xs font-bold border border-indigo-200 dark:border-indigo-800">
@@ -725,6 +764,7 @@ const StudentManager: React.FC<StudentManagerProps> = ({ onNavigateToProfile, on
                 <p className="text-gray-500 dark:text-gray-400 text-sm">View and manage student records for the current academic session</p>
             </div>
 
+            {/* ... Search Bar ... */}
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-3 sticky top-0 z-10">
                 <div className="flex flex-col md:flex-row gap-3 items-center">
                     <div className="relative flex-1 w-full md:w-auto">
@@ -786,6 +826,7 @@ const StudentManager: React.FC<StudentManagerProps> = ({ onNavigateToProfile, on
                 </div>
             </div>
 
+            {/* ... Student List Grid ... */}
             {filteredStudents.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-6">
                     {filteredStudents.map((student) => {
@@ -886,7 +927,7 @@ const StudentManager: React.FC<StudentManagerProps> = ({ onNavigateToProfile, on
 
                                 {/* Expanded Actions */}
                                 <div className={`
-                                    flex items-start justify-center gap-3
+                                    flex items-start justify-center gap-3 
                                     transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] origin-top overflow-hidden
                                     ${isExpanded ? 'max-h-40 opacity-100 pt-4 pb-6' : 'max-h-0 opacity-0 py-0'}
                                 `}>
@@ -1260,7 +1301,7 @@ const StudentManager: React.FC<StudentManagerProps> = ({ onNavigateToProfile, on
                 </div>
             )}
             
-            {/* --- ADD CLASS MODAL --- */}
+            {/* ... Other Modals ... */}
             {isAddClassModalOpen && userRole === UserRole.ADMIN && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                     <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">

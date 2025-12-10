@@ -129,6 +129,7 @@ const App: React.FC = () => {
             onBack={handleBackToManager} 
             userRole={user.role} 
             onNavigateToParentProfile={handleNavigateToParentProfile}
+            onNavigateToFees={handleNavigateToFees}
         />;
 
       case AppView.PARENT_PROFILE:

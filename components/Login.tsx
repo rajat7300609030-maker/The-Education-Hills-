@@ -1,6 +1,6 @@
 
-import React, { useState } from 'react';
-import { UserRole, User, Student } from '../types';
+import React, { useState, useEffect } from 'react';
+import { UserRole, User, Student, SchoolProfile } from '../types';
 import { School, ArrowRight, Shield, Briefcase, GraduationCap, CheckCircle2, User as UserIcon, Calendar, Lock } from 'lucide-react';
 import { db } from '../services/db';
 
@@ -11,11 +11,16 @@ interface LoginProps {
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [selectedRole, setSelectedRole] = useState<UserRole>(UserRole.ADMIN);
   const [loading, setLoading] = useState(false);
+  const [schoolProfile, setSchoolProfile] = useState<SchoolProfile | null>(null);
   const [credentials, setCredentials] = useState({
       userId: '',
       dob: '',
       password: ''
   });
+
+  useEffect(() => {
+      setSchoolProfile(db.getSchoolProfile());
+  }, []);
 
   const handleLogin = () => {
     setLoading(true);
@@ -156,16 +161,24 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const currentTheme = getRoleTheme(selectedRole);
 
   return (
-    <div className="min-h-screen flex bg-white dark:bg-gray-900 font-sans transition-colors duration-300">
+    <div className="min-h-screen flex bg-white dark:bg-black font-sans transition-colors duration-300">
       {/* Left Panel - Branding (Desktop only) */}
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden flex-col justify-between p-16 text-white">
          {/* Background Image & Overlay */}
          <div className="absolute inset-0 z-0">
-            <img 
-                src="https://images.unsplash.com/photo-1523050854058-8df90110c9f1?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80" 
-                alt="University Campus" 
-                className="w-full h-full object-cover"
-            />
+            {schoolProfile?.backgroundImage ? (
+                <img 
+                    src={schoolProfile.backgroundImage} 
+                    alt="Campus" 
+                    className="w-full h-full object-cover"
+                />
+            ) : (
+                <img 
+                    src="https://images.unsplash.com/photo-1523050854058-8df90110c9f1?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80" 
+                    alt="University Campus" 
+                    className="w-full h-full object-cover"
+                />
+            )}
             <div className="absolute inset-0 bg-indigo-950/90"></div>
             <div className="absolute inset-0 bg-gradient-to-br from-indigo-900/50 to-purple-900/50 mix-blend-overlay"></div>
          </div>
@@ -179,21 +192,35 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
          
          {/* Content */}
          <div className="relative z-10 animate-in slide-in-from-top-8 duration-700">
-            <div className="flex items-center gap-3 mb-8">
-                <div className="w-12 h-12 bg-white/10 backdrop-blur-md rounded-xl flex items-center justify-center border border-white/20 shadow-xl">
-                    <span className="font-bold text-2xl">E</span>
+            <div className="flex items-center gap-4 mb-8">
+                <div className="w-14 h-14 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center border border-white/20 shadow-xl overflow-hidden p-1">
+                    {schoolProfile?.logo ? (
+                        <img src={schoolProfile.logo} alt="Logo" className="w-full h-full object-cover rounded-xl" />
+                    ) : (
+                        <span className="font-bold text-2xl">{schoolProfile?.name.charAt(0) || 'E'}</span>
+                    )}
                 </div>
                 <div className="flex flex-col">
-                    <span className="font-bold tracking-wider text-lg leading-none">THE EDUCATION</span>
-                    <span className="font-light tracking-widest text-sm text-indigo-300">HILLS</span>
+                    <span className="font-bold tracking-wider text-xl leading-tight uppercase">{schoolProfile?.name || 'THE EDUCATION HILLS'}</span>
+                    <span className="inline-block mt-1 px-2 py-0.5 rounded bg-white/20 text-[10px] font-bold tracking-widest text-indigo-100 uppercase w-fit">
+                        Session: {schoolProfile?.currentSession || '2024-2025'}
+                    </span>
                 </div>
             </div>
          </div>
 
          <div className="relative z-10 max-w-lg space-y-6 animate-in slide-in-from-left-8 duration-1000 delay-150">
-            <h1 className="text-5xl md:text-6xl font-bold leading-tight">
-                Knowledge is <br/>
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-300 to-purple-300">Power.</span>
+            <h1 className="text-4xl md:text-5xl font-bold leading-tight">
+                {schoolProfile?.tagline ? (
+                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-indigo-100 to-indigo-300">
+                        "{schoolProfile.tagline}"
+                    </span>
+                ) : (
+                    <>
+                        Knowledge is <br/>
+                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-300 to-purple-300">Power.</span>
+                    </>
+                )}
             </h1>
             <p className="text-indigo-200 text-lg leading-relaxed max-w-md">
                 Welcome to the next generation of school management. Streamlined fees, real-time insights, and seamless communication.
@@ -205,20 +232,35 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
          </div>
 
          <div className="relative z-10 text-indigo-400 text-sm animate-in fade-in duration-1000 delay-300">
-            © 2024 The Education Hills. All rights reserved.
+            © {new Date().getFullYear()} {schoolProfile?.name || 'The Education Hills'}. All rights reserved.
          </div>
       </div>
 
       {/* Right Panel - Login Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-12 relative overflow-hidden bg-white dark:bg-gray-900">
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-12 relative overflow-hidden bg-white dark:bg-black">
         {/* Subtle Background Pattern */}
-        <div className="absolute inset-0 bg-gray-50 dark:bg-gray-900 z-0">
+        <div className="absolute inset-0 bg-gray-50 dark:bg-black z-0">
              <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05]" style={{ backgroundImage: 'radial-gradient(#4f46e5 1px, transparent 1px)', backgroundSize: '24px 24px' }}></div>
         </div>
 
         <div className="w-full max-w-md space-y-8 animate-in zoom-in-95 duration-500 relative z-10">
             <div className="text-center lg:text-left">
-                <div className="lg:hidden w-16 h-16 bg-indigo-100 dark:bg-indigo-900/50 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-sm">
+                {/* Mobile Branding (Visible only on small screens) */}
+                <div className="lg:hidden mb-8 flex flex-col items-center">
+                    <div className="w-20 h-20 bg-white dark:bg-gray-800 rounded-2xl flex items-center justify-center shadow-md border border-gray-100 dark:border-gray-700 overflow-hidden p-1 mb-3">
+                        {schoolProfile?.logo ? (
+                            <img src={schoolProfile.logo} alt="Logo" className="w-full h-full object-cover rounded-xl" />
+                        ) : (
+                            <School className="w-10 h-10 text-indigo-600 dark:text-indigo-400" />
+                        )}
+                    </div>
+                    <h2 className="text-xl font-bold text-gray-900 dark:text-white text-center leading-tight">{schoolProfile?.name || 'Education Hills'}</h2>
+                    <span className="mt-1 px-3 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-xs font-bold uppercase border border-indigo-100 dark:border-indigo-800">
+                        Session {schoolProfile?.currentSession}
+                    </span>
+                </div>
+
+                <div className="lg:hidden w-16 h-16 bg-indigo-100 dark:bg-indigo-900/50 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-sm hidden">
                     <School className="w-8 h-8 text-indigo-600 dark:text-indigo-400" />
                 </div>
                 <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Welcome back</h2>
@@ -348,7 +390,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 
                 <div className="text-center space-y-2">
                      <p className="text-xs text-gray-400 dark:text-gray-500">
-                        Protected by EduHills SecureAuth™
+                        Protected by {schoolProfile?.name || 'EduHills'} SecureAuth™
                     </p>
                 </div>
             </div>

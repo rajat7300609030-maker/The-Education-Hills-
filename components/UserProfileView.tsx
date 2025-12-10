@@ -19,6 +19,7 @@ const UserProfileView: React.FC<UserProfileViewProps> = ({ user, onUpdateUser, o
     const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'activity'>('profile');
     const [isEditing, setIsEditing] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const coverInputRef = useRef<HTMLInputElement>(null);
 
     // Form States
     const [formData, setFormData] = useState({
@@ -27,6 +28,7 @@ const UserProfileView: React.FC<UserProfileViewProps> = ({ user, onUpdateUser, o
         phone: user.phone || '+91 98765 43210',
         bio: user.bio || 'Administrator at The Education Hills. Committed to excellence in education management.',
         avatar: user.avatar,
+        coverImage: user.coverImage,
         dob: user.dob || ''
     });
 
@@ -39,6 +41,7 @@ const UserProfileView: React.FC<UserProfileViewProps> = ({ user, onUpdateUser, o
             phone: user.phone || prev.phone,
             bio: user.bio || prev.bio,
             avatar: user.avatar,
+            coverImage: user.coverImage,
             dob: user.dob || prev.dob
         }));
     }, [user]);
@@ -49,17 +52,68 @@ const UserProfileView: React.FC<UserProfileViewProps> = ({ user, onUpdateUser, o
         confirm: ''
     });
 
-    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Helper: Compress Image
+    const compressImage = (file: File, maxWidth: number, maxHeight: number, quality: number = 0.7): Promise<string> => {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = (event) => {
+                const img = new Image();
+                img.src = event.target?.result as string;
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > height) {
+                        if (width > maxWidth) {
+                            height = Math.round(height * (maxWidth / width));
+                            width = maxWidth;
+                        }
+                    } else {
+                        if (height > maxHeight) {
+                            width = Math.round(width * (maxHeight / height));
+                            height = maxHeight;
+                        }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx?.drawImage(img, 0, 0, width, height);
+                    resolve(canvas.toDataURL('image/jpeg', quality));
+                };
+            };
+        });
+    };
+
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                const newAvatar = reader.result as string;
-                setFormData(prev => ({ ...prev, avatar: newAvatar }));
-                onUpdateUser({ ...user, avatar: newAvatar });
+            try {
+                const compressed = await compressImage(file, 400, 400); // 400x400 max for avatars
+                setFormData(prev => ({ ...prev, avatar: compressed }));
+                onUpdateUser({ ...user, avatar: compressed });
                 showNotification("Profile picture updated", "success");
-            };
-            reader.readAsDataURL(file);
+            } catch (err) {
+                console.error("Image processing error", err);
+                showNotification("Failed to process image", "error");
+            }
+        }
+    };
+
+    const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            try {
+                const compressed = await compressImage(file, 1000, 400, 0.6); // 1000x400 max for covers, lower quality
+                setFormData(prev => ({ ...prev, coverImage: compressed }));
+                onUpdateUser({ ...user, coverImage: compressed });
+                showNotification("Cover image updated", "success");
+            } catch (err) {
+                console.error("Image processing error", err);
+                showNotification("Failed to process image", "error");
+            }
         }
     };
 
@@ -71,7 +125,8 @@ const UserProfileView: React.FC<UserProfileViewProps> = ({ user, onUpdateUser, o
             email: formData.email,
             phone: formData.phone,
             bio: formData.bio,
-            dob: formData.dob
+            dob: formData.dob,
+            coverImage: formData.coverImage 
         });
         showNotification("Profile details saved successfully", "success");
         setIsEditing(false);
@@ -96,13 +151,34 @@ const UserProfileView: React.FC<UserProfileViewProps> = ({ user, onUpdateUser, o
         <div className="max-w-5xl mx-auto space-y-6 animate-in fade-in duration-500 pb-10">
             {/* Header Banner */}
             <div className="relative bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-                <div className="h-48 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-800 relative">
-                    <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-20"></div>
+                <div className="h-48 relative bg-gray-200 dark:bg-gray-900 group">
+                    {formData.coverImage ? (
+                        <img 
+                            src={formData.coverImage} 
+                            alt="Cover" 
+                            className="w-full h-full object-cover"
+                        />
+                    ) : (
+                        <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-800">
+                            <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-20"></div>
+                        </div>
+                    )}
+                    
                     {isEditing && (
-                        <div className="absolute bottom-4 right-6 flex gap-3 animate-in fade-in">
-                            <button className="px-4 py-2 bg-white/20 backdrop-blur-md text-white rounded-xl text-xs font-bold hover:bg-white/30 transition-colors flex items-center gap-2">
+                        <div className="absolute bottom-4 right-6 flex gap-3 animate-in fade-in z-10">
+                            <button 
+                                onClick={() => coverInputRef.current?.click()}
+                                className="px-4 py-2 bg-black/40 backdrop-blur-md text-white rounded-xl text-xs font-bold hover:bg-black/50 transition-colors flex items-center gap-2 border border-white/20"
+                            >
                                 <Camera className="w-4 h-4" /> 📷 Change Cover
                             </button>
+                            <input 
+                                type="file" 
+                                ref={coverInputRef} 
+                                className="hidden" 
+                                accept="image/*" 
+                                onChange={handleCoverUpload}
+                            />
                         </div>
                     )}
                 </div>
@@ -111,7 +187,7 @@ const UserProfileView: React.FC<UserProfileViewProps> = ({ user, onUpdateUser, o
                     <div className="flex flex-col md:flex-row gap-6 items-start -mt-16">
                         {/* Avatar */}
                         <div className="relative group">
-                            <div className="w-32 h-32 rounded-3xl bg-white dark:bg-gray-800 p-1.5 shadow-xl">
+                            <div className="w-32 h-32 rounded-3xl bg-white dark:bg-gray-800 p-1.5 shadow-xl relative z-20">
                                 <div className="w-full h-full bg-indigo-50 dark:bg-gray-700 rounded-2xl flex items-center justify-center overflow-hidden border border-gray-200 dark:border-gray-600">
                                     {formData.avatar ? (
                                         <img src={formData.avatar} alt="Profile" className="w-full h-full object-cover" />
@@ -124,7 +200,7 @@ const UserProfileView: React.FC<UserProfileViewProps> = ({ user, onUpdateUser, o
                             {isEditing && (
                                 <button 
                                     onClick={() => fileInputRef.current?.click()}
-                                    className="absolute bottom-2 right-2 p-2 bg-indigo-600 text-white rounded-full shadow-lg hover:bg-indigo-700 transition-transform hover:scale-110 animate-in zoom-in"
+                                    className="absolute bottom-2 right-2 p-2 bg-indigo-600 text-white rounded-full shadow-lg hover:bg-indigo-700 transition-transform hover:scale-110 animate-in zoom-in z-30"
                                     title="Upload Photo"
                                 >
                                     <Camera className="w-4 h-4" />

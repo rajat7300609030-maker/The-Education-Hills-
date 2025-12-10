@@ -3,15 +3,16 @@ import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { ArrowLeft, Phone, MessageCircle, User, Users, MapPin, Mail, AlertCircle, AlertTriangle, CreditCard, FileText, History, ChevronDown, ChevronUp, Download, Clock, DollarSign, CheckCircle, X, Edit, Eye, Trash2, Share2, Save, BarChart3, TrendingUp, Wallet } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { db } from '../services/db';
-import { Student, PaymentRecord, FeeStructure } from '../types';
+import { Student, PaymentRecord, FeeStructure, UserRole } from '../types';
 
 interface Props {
     studentId: string | null;
     onBack: () => void;
     onNavigateToFees?: (studentId: string) => void;
+    userRole?: UserRole;
 }
 
-const ParentProfileView: React.FC<Props> = ({ studentId, onBack, onNavigateToFees }) => {
+const ParentProfileView: React.FC<Props> = ({ studentId, onBack, onNavigateToFees, userRole = UserRole.ADMIN }) => {
     const [payments, setPayments] = useState<PaymentRecord[]>([]);
     const [fees, setFees] = useState<FeeStructure[]>([]);
     const [students, setStudents] = useState<Student[]>([]);
@@ -516,12 +517,14 @@ const ParentProfileView: React.FC<Props> = ({ studentId, onBack, onNavigateToFee
 
                                     {/* Action Bar */}
                                     <div className="mt-6 flex flex-wrap gap-3 pt-4 border-t border-gray-100 dark:border-gray-700">
-                                        <button 
-                                            onClick={() => openPayModal(child)}
-                                            className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-bold hover:bg-green-700 transition-colors shadow-sm"
-                                        >
-                                            <CreditCard className="w-4 h-4" /> Pay Fees
-                                        </button>
+                                        {(userRole === UserRole.ADMIN || userRole === UserRole.EMPLOYEE) && (
+                                            <button 
+                                                onClick={() => openPayModal(child)}
+                                                className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-bold hover:bg-green-700 transition-colors shadow-sm"
+                                            >
+                                                <CreditCard className="w-4 h-4" /> Pay Fees
+                                            </button>
+                                        )}
                                         {/* No Per-Child History Toggle Button as per user intent for unified list, but logic kept implicitly */}
                                     </div>
                                 </div>
@@ -611,9 +614,9 @@ const ParentProfileView: React.FC<Props> = ({ studentId, onBack, onNavigateToFee
                                         ${isPaymentExpanded ? 'max-h-40 opacity-100 pt-4 pb-2' : 'max-h-0 opacity-0 py-0'}
                                     `}>
                                         {[
-                                            { icon: <Eye className="w-4 h-4" />, label: 'Receipt', onClick: () => { setSelectedPayment(payment); setIsReceiptModalOpen(true); }, color: 'text-blue-600', ring: 'group-hover/btn:ring-blue-200' },
-                                            { icon: <Trash2 className="w-4 h-4" />, label: 'Delete', onClick: () => handleDeleteClick(payment), color: 'text-red-600', ring: 'group-hover/btn:ring-red-200' }
-                                        ].map((action, idx) => (
+                                            { icon: <Eye className="w-4 h-4" />, label: 'Receipt', onClick: () => { setSelectedPayment(payment); setIsReceiptModalOpen(true); }, color: 'text-blue-600', ring: 'group-hover/btn:ring-blue-200', role: 'ALL' },
+                                            { icon: <Trash2 className="w-4 h-4" />, label: 'Delete', onClick: () => handleDeleteClick(payment), color: 'text-red-600', ring: 'group-hover/btn:ring-red-200', role: UserRole.ADMIN }
+                                        ].filter(action => action.role === 'ALL' || action.role === userRole).map((action, idx) => (
                                             <button 
                                                 key={idx}
                                                 onClick={(e) => { e.stopPropagation(); action.onClick(); }}
